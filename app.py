@@ -1,6 +1,5 @@
 from collections import deque
 from PIL import Image
-from cv2 import threshold
 import streamlit as st
 import matplotlib.pyplot as plt
 import cv2
