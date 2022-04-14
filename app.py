@@ -10,8 +10,8 @@ import uuid
 import os
 import img2pdf
 
-# main_image = Image.open('main.jpg')
-# st.image(main_image)
+main_image = Image.open('main.jpg')
+st.image(main_image)
 
 """
 ## Let's get started!

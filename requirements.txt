@@ -1,6 +1,6 @@
 img2pdf==0.4.4
 matplotlib==3.5.1
-numpy==1.22.1
+numpy==1.21.3
 opencv-contrib-python==4.5.5.62
 opencv-python==4.5.5.62
 Pillow==9.0.0
