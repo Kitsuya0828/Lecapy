@@ -1,6 +1,6 @@
 img2pdf==0.4.4
 matplotlib==3.5.1
 numpy==1.21.3
-opencv-python-headless==4.2.0.32
+opencv-python-headless==4.5.5.64
 Pillow==9.0.0
 streamlit==1.8.1
