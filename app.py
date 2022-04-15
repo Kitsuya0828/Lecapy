@@ -46,26 +46,35 @@ def capture_frame(video_path: str, step_frame: int, UUID: str):
     bar_cap = st.progress(0)
 
     step_num = len(range(0, video_frame_count, step_frame))
-    index = 0
+    frame_index = 0
+    caps =[]
 
     for n in range(0, video_frame_count, step_frame):
         cap.set(cv2.CAP_PROP_POS_FRAMES, n)
         ret, frame = cap.read()
 
-        index += 1
-        text_cap.text(f'キャプチャを抽出中 {int(100*index/step_num)}%')
-        bar_cap.progress(index/step_num)
+        frame_index += 1
+        text_cap.text(f'キャプチャを抽出中 {int(100*frame_index/step_num)}%')
+        bar_cap.progress(frame_index/step_num)
 
         if ret:
-            cv2.imwrite(f'static/{UUID}/{str(n).zfill(digit)}.jpg', frame)
+            image = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
+            im = Image.fromarray(image)
+            im.save(Path(f'static/{UUID}_{str(n).zfill(digit)}.jpg').absolute())
+            caps.append(n)
+            # cv2.imwrite(f'static/{UUID}/{str(n).zfill(digit)}.jpg', frame)
+    
+    return frame_index, digit, caps
 
 
-def deduplicate_frame(UUID: str, threshold: int, frame_size: tuple, scale: int):
-    IMG_DIR = f'static/{UUID}/'
+def deduplicate_frame(caps: list, digit: int, UUID: str, threshold: int, frame_size: tuple, scale: int):
+    IMG_DIR = f'static/'
     IMG_SIZE = tuple(map(lambda x: x//scale, frame_size))
 
     dump_list = []
-    files = deque(os.listdir(Path(IMG_DIR).absolute()))    # 逆順から類似判定
+    files = [f'static/{UUID}_{str(n).zfill(digit)}.jpg' for n in caps]
+    que = deque(files[::-1])
+    # files = deque(os.listdir(Path(IMG_DIR).absolute()))    # 逆順から類似判定
     num_files = len(files)
 
     index = 1
@@ -73,10 +82,10 @@ def deduplicate_frame(UUID: str, threshold: int, frame_size: tuple, scale: int):
     text_judge = st.empty()
     bar_judge = st.progress(index/num_files)
 
-    while files:
-        target_file = files.popleft()
-        target_img_path = Path(IMG_DIR + target_file).absolute()
-        target_img = cv2.imread(str(target_img_path), cv2.IMREAD_GRAYSCALE)
+    while que:
+        target_file = que.popleft()
+        # target_img_path = Path(IMG_DIR + target_file).absolute()
+        target_img = cv2.imread(target_file, cv2.IMREAD_GRAYSCALE)
         if scale != 1:
             target_img = cv2.resize(target_img, IMG_SIZE)
 
@@ -86,14 +95,14 @@ def deduplicate_frame(UUID: str, threshold: int, frame_size: tuple, scale: int):
 
         same_slide = True
         while same_slide:
-            if not files:
+            if not que:
                 break
 
-            comparing_file = files.popleft()
-            comparing_img_path = Path(IMG_DIR + comparing_file).absolute()
+            comparing_file = que.popleft()
+            # comparing_img_path = Path(IMG_DIR + comparing_file).absolute()
 
             try:
-                comparing_img = cv2.imread(str(comparing_img_path), cv2.IMREAD_GRAYSCALE)
+                comparing_img = cv2.imread(comparing_file, cv2.IMREAD_GRAYSCALE)
                 if scale != 1:
                     comparing_img = cv2.resize(comparing_img, IMG_SIZE)
 
@@ -112,21 +121,17 @@ def deduplicate_frame(UUID: str, threshold: int, frame_size: tuple, scale: int):
             if ret < threshold:
                 dump_list.append(comparing_file)
             else:
-                files.appendleft(comparing_file)    # 次のターゲット画像
+                que.appendleft(comparing_file)    # 次のターゲット画像
                 same_slide = False
     return dump_list[::-1]
 
 
-def generate_pdf(UUID: str, dump_list: list):
-    img_folder = f'static/{UUID}/'
-    img_folder_path = Path(img_folder).absolute()
-    save_path = Path(f'static/{UUID}.pdf').absolute()
-    with open(str(save_path), "wb") as f:
+def generate_pdf(UUID: str, dump_list: list, all_img_list: list):
+    with open(f'{UUID}.pdf', "wb") as f:
         pdf_file_path_list = []
-        for file in os.listdir(img_folder_path):
-            if file not in dump_list:
-                path = str(Path(img_folder+file).absolute())
-                pdf_file_path_list.append(path)
+        for file_path in lsdir:
+            if file_path not in dump_list:
+                pdf_file_path_list.append(file_path)
         f.write(img2pdf.convert(pdf_file_path_list))
 
 
@@ -157,29 +162,27 @@ if uploaded_file is not None:
 
     UUID = uuid.uuid4()  # ユニークなID
     
-    path_2_static = os.path.join(os.path.dirname(os.path.abspath(__file__)), "static")
-    path_2_uuid = os.path.join(path_2_static, str(UUID))
+    # path_2_static = os.path.join(os.path.dirname(os.path.abspath(__file__)), "static")
+    # path_2_uuid = os.path.join(path_2_static, str(UUID))
 
-    os.mkdir(path_2_uuid)
-    capture_frame(tfile.name, interval_frame_count, UUID)
-    dump_list = deduplicate_frame(UUID, threshold, (video_height, video_width), scale)
+    frame_index, digit, caps = capture_frame(tfile.name, interval_frame_count, UUID)
+    dump_list = deduplicate_frame(caps, digit, UUID, threshold, (video_height, video_width), scale)
      
-    root = f"static/{UUID}"
-    lsdir = os.listdir(Path(root).absolute())
+    lsdir = [f'static/{UUID}_{str(n).zfill(digit)}.jpg' for n in caps]
     imgs = []
     text_plot = st.empty()
     bar_plot = st.progress(0)
     step_num = len(lsdir)
     index = 1
-    for l in lsdir:
-        target = os.path.join(root, l)
+    
+    for img_path in lsdir:
         height, width = video_height, video_width
 
-        if l in dump_list:  # 似ているフレーム
-            img = cv2.imread(str(Path(target).absolute()), cv2.IMREAD_GRAYSCALE)
+        if img_path in dump_list:  # 似ているフレーム
+            img = cv2.imread(img_path, cv2.IMREAD_GRAYSCALE)
             img = cv2.bitwise_not(img)
         else:
-            img = cv2.imread(str(Path(target).absolute()))
+            img = cv2.imread(img_path)
             img = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
             cv2.putText(img, str(index), (0, height//2), cv2.FONT_HERSHEY_PLAIN, width*height/(200**2), (255, 0, 0), 20, cv2.LINE_AA)
             index += 1
@@ -208,10 +211,10 @@ if uploaded_file is not None:
                 text_plot.text(f'イメージをプロット中 {int(100*cnt/step_num)}%')
     st.pyplot(fig)
 
-    generate_pdf(UUID, dump_list)
+    generate_pdf(UUID, dump_list, lsdir)
     st.markdown("※ 反転していない画像がダウンロードPDFに含まれます")
 
-    with open(str(Path(f"static/{UUID}.pdf").absolute()), "rb") as file:
+    with open(f"{UUID}.pdf", "rb") as file:
         btn = st.download_button(
             label="Download PDF",
             data=file,
