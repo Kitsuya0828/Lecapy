@@ -75,8 +75,8 @@ def deduplicate_frame(UUID: str, threshold: int, frame_size: tuple, scale: int):
 
     while files:
         target_file = files.popleft()
-        target_img_path = IMG_DIR + target_file
-        target_img = cv2.imread(Path(target_img_path).absolute(), cv2.IMREAD_GRAYSCALE)
+        target_img_path = Path(IMG_DIR + target_file).absolute()
+        target_img = cv2.imread(str(target_img_path), cv2.IMREAD_GRAYSCALE)
         if scale != 1:
             target_img = cv2.resize(target_img, IMG_SIZE)
 
@@ -90,10 +90,10 @@ def deduplicate_frame(UUID: str, threshold: int, frame_size: tuple, scale: int):
                 break
 
             comparing_file = files.popleft()
-            comparing_img_path = IMG_DIR + comparing_file
+            comparing_img_path = Path(IMG_DIR + comparing_file).absolute()
 
             try:
-                comparing_img = cv2.imread(Path(comparing_img_path).absolute(), cv2.IMREAD_GRAYSCALE)
+                comparing_img = cv2.imread(str(comparing_img_path), cv2.IMREAD_GRAYSCALE)
                 if scale != 1:
                     comparing_img = cv2.resize(comparing_img, IMG_SIZE)
 
@@ -119,8 +119,15 @@ def deduplicate_frame(UUID: str, threshold: int, frame_size: tuple, scale: int):
 
 def generate_pdf(UUID: str, dump_list: list):
     img_folder = f'static/{UUID}/'
-    with open(f'static/{UUID}.pdf', "wb") as f:
-        f.write(img2pdf.convert([Image.open(Path(img_folder+file.filename).absolute) for file in os.listdir(img_folder) if file not in dump_list]))
+    img_folder_path = Path(img_folder).absolute()
+    save_path = Path(f'static/{UUID}.pdf').absolute()
+    with open(str(save_path), "wb") as f:
+        pdf_file_path_list = []
+        for file in os.listdir(img_folder_path):
+            if file not in dump_list:
+                path = str(Path(img_folder+file).absolute())
+                pdf_file_path_list.append(path)
+        f.write(img2pdf.convert(pdf_file_path_list))
 
 
 if uploaded_file is not None:
@@ -149,8 +156,11 @@ if uploaded_file is not None:
     st.sidebar.write('↪', interval_frame_count, 'フレーム', '÷', f'{video_fps} FPS', '=', f'{interval_range} 間隔')
 
     UUID = uuid.uuid4()  # ユニークなID
+    
+    path_2_static = os.path.join(os.path.dirname(os.path.abspath(__file__)), "static")
+    path_2_uuid = os.path.join(path_2_static, str(UUID))
 
-    os.mkdir(f'static/{UUID}')
+    os.mkdir(path_2_uuid)
     capture_frame(tfile.name, interval_frame_count, UUID)
     dump_list = deduplicate_frame(UUID, threshold, (video_height, video_width), scale)
      
@@ -166,10 +176,10 @@ if uploaded_file is not None:
         height, width = video_height, video_width
 
         if l in dump_list:  # 似ているフレーム
-            img = cv2.imread(Path(target).absolute(), cv2.IMREAD_GRAYSCALE)
+            img = cv2.imread(str(Path(target).absolute()), cv2.IMREAD_GRAYSCALE)
             img = cv2.bitwise_not(img)
         else:
-            img = cv2.imread(Path(target).absolute())
+            img = cv2.imread(str(Path(target).absolute()))
             img = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
             cv2.putText(img, str(index), (0, height//2), cv2.FONT_HERSHEY_PLAIN, width*height/(200**2), (255, 0, 0), 20, cv2.LINE_AA)
             index += 1
@@ -201,7 +211,7 @@ if uploaded_file is not None:
     generate_pdf(UUID, dump_list)
     st.markdown("※ 反転していない画像がダウンロードPDFに含まれます")
 
-    with open(Path(f"static/{UUID}.pdf").absolute(), "rb") as file:
+    with open(str(Path(f"static/{UUID}.pdf").absolute()), "rb") as file:
         btn = st.download_button(
             label="Download PDF",
             data=file,
