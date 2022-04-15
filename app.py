@@ -54,15 +54,15 @@ def capture_frame(video_path: str, step_frame: int, UUID: str):
         bar_cap.progress(index/step_num)
         
         if ret:
-            cv2.imwrite(f'static/{UUID}/{str(n).zfill(digit)}.jpg', frame)
+            cv2.imwrite(f'static/{UUID}_{str(n).zfill(digit)}.jpg', frame)
 
 
 def deduplicate_frame(UUID: str, threshold: int, frame_size: tuple, scale: int):
-    IMG_DIR = f'static/{UUID}/'
+    IMG_DIR = f'static/'
     IMG_SIZE = tuple(map(lambda x: x//scale, frame_size))
     
     dump_list = []
-    files = deque(os.listdir(IMG_DIR)[::-1])    # 逆順から類似判定
+    files = deque([file for file in os.listdir(IMG_DIR)[::-1] if str(file).startswith(str(UUID))])    # 逆順から類似判定
     num_files = len(files)
     
     index = 1
@@ -113,9 +113,10 @@ def deduplicate_frame(UUID: str, threshold: int, frame_size: tuple, scale: int):
     return dump_list[::-1]
     
 def generate_pdf(UUID: str, dump_list: list):
-    img_folder = f'static/{UUID}/'
+    img_folder = f'static/'
+    folder = [file for file in os.listdir(img_folder) if str(file).startswith(str(UUID))]
     with open(f'static/{UUID}.pdf', "wb") as f:
-        f.write(img2pdf.convert([Image.open(img_folder+file).filename for file in os.listdir(img_folder) if file not in dump_list]))
+        f.write(img2pdf.convert([Image.open(img_folder+file).filename for file in folder if file not in dump_list]))
     
     
 
@@ -147,12 +148,13 @@ if uploaded_file is not None:
     
     UUID = uuid.uuid4() # ユニークなID
     
-    os.mkdir(f'static/{UUID}')
+    # os.mkdir(f'static/{UUID}')
     capture_frame(tfile.name, interval_frame_count, UUID)
     dump_list = deduplicate_frame(UUID, threshold, (video_height, video_width), scale)
     
-    root = f"static/{UUID}"
+    root = f"static/"
     lsdir = os.listdir(root)
+    lsdir = [file for file in lsdir if str(file).startswith(str(UUID))]
     imgs = []
     text_plot = st.empty()
     bar_plot = st.progress(0)
